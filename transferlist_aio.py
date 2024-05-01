@@ -57,6 +57,7 @@ class TransferList(dmc.SimpleGrid):
     ):
         super().__init__(
             [
+                # First list
                 dmc.Stack(
                     [
                         *([dmc.Text(titles[0], fw=600)] if titles else []),
@@ -80,6 +81,7 @@ class TransferList(dmc.SimpleGrid):
                     ],
                     gap="0.375rem",
                 ),
+                # Second list
                 dmc.Stack(
                     [
                         *([dmc.Text(titles[1], fw=600)] if titles else []),
@@ -103,6 +105,7 @@ class TransferList(dmc.SimpleGrid):
                     ],
                     gap="0.375rem",
                 ),
+                # This input holds the actual value as well as some metadata to pass to callbacks
                 dmc.JsonInput(
                     id=self.ids.main(aio_id),
                     style={"display": "none"},
@@ -121,6 +124,10 @@ class TransferList(dmc.SimpleGrid):
 
     @classmethod
     def checkbox(cls, value: dict):
+        """Checkbox for the checklist.
+
+        :param value: value of the checkbox, dict with keys label and value
+        """
         return dmc.Checkbox(
             label=value["label"],
             value=value["value"],
@@ -134,22 +141,41 @@ class TransferList(dmc.SimpleGrid):
 
     @classmethod
     def checklist(
-        cls, aio_id: str, position: Literal["left", "right"], value: list[dict], list_height: int, limit: int = None
+        cls,
+        aio_id: str,
+        side: Literal["left", "right"],
+        value: list[dict],
+        list_height: int,
+        limit: int = None,
     ):
+        """Checklist in a scrollarea for each list of the transfer.
+
+        :param aio_id: id of the AIO component
+        :param side: list side
+        :param value: list value, list of dicts with keys label and value
+        :param list_height: height of the checklist
+        :param limit: limit the number of items displayed in the checklist
+        """
         if limit:
             value = value[:limit]
         return dmc.ScrollArea(
             dmc.CheckboxGroup(
                 [cls.checkbox(val) for val in value],
                 py="0.25rem",
-                id=cls.ids.checklist(aio_id, position),
+                id=cls.ids.checklist(aio_id, side),
             ),
             style={"height": list_height},
             px="0.5rem",
         )
 
     @classmethod
-    def search_input(cls, aio_id: str, position: Literal["left", "right"], **kwargs):
+    def search_input(cls, aio_id: str, side: Literal["left", "right"], **kwargs):
+        """List search input.
+
+        :param aio_id: id of the AIO component
+        :param side: list side
+        :param **kwargs: kwargs to pass to the TextInput
+        """
         return dmc.TextInput(
             styles={
                 "root": {"flex": 1},
@@ -160,19 +186,24 @@ class TransferList(dmc.SimpleGrid):
                 }
             },
             radius=0,
-            id=cls.ids.search(aio_id, position),
+            id=cls.ids.search(aio_id, side),
             debounce=250,
             **kwargs,
         )
 
     @classmethod
-    def transfer_all(cls, aio_id: str, position: Literal["left", "right"]):
-        icon_side = "left" if position == "right" else "right"
+    def transfer_all(cls, aio_id: str, side: Literal["left", "right"]):
+        """Transfer all button.
+
+        :param aio_id: id of the AIO component
+        :param side: list side
+        """
+        icon_side = "left" if side == "right" else "right"
         return dmc.Paper(
             dmc.UnstyledButton(
                 DashIconify(icon=f"uiw:d-arrow-{icon_side}", height=12),
                 style={"height": 34, "width": 34, "display": "grid", "placeContent": "center"},
-                id=cls.ids.transfer_all(aio_id, position)
+                id=cls.ids.transfer_all(aio_id, side)
             ),
             withBorder=True,
             radius=0,
@@ -184,23 +215,29 @@ class TransferList(dmc.SimpleGrid):
         )
 
     @classmethod
-    def transfer(cls, aio_id: str, position: Literal["left", "right"], show_transfer_all: bool):
-        icon_side = "left" if position == "right" else "right"
+    def transfer(cls, aio_id: str, side: Literal["left", "right"], show_transfer_all: bool):
+        """Transfer button.
+
+        :param aio_id: id of the AIO component
+        :param side: list side
+        :param show_transfer_all: whether the transfer all button is visible (impacts border style)
+        """
+        icon_side = "left" if side == "right" else "right"
         return dmc.Paper(
             dmc.UnstyledButton(
                 DashIconify(icon=f"uiw:{icon_side}", height=12),
                 style={"height": 34, "width": 34, "display": "grid", "placeContent": "center"},
-                id=cls.ids.transfer(aio_id, position)
+                id=cls.ids.transfer(aio_id, side)
             ),
             withBorder=True,
             radius=0,
             style={"borderTop": "none"} | (
                 {"borderRight": "none"}
-                if not show_transfer_all and position == "right"
+                if not show_transfer_all and side == "right"
                 else {}
             ) | (
                 {"borderLeft": "none"}
-                if not show_transfer_all and position == "left"
+                if not show_transfer_all and side == "left"
                 else {}
             )
         )
@@ -216,9 +253,17 @@ class TransferList(dmc.SimpleGrid):
     State(TransferList.ids.checklist(MATCH, MATCH), "value"),
     prevent_initial_call=True,
 )
-def update_checklist(search, values, nothing_found, placeholder,selection):
+def filter_checklist(
+    search: str,
+    values: list[list[dict]],
+    nothing_found: str,
+    placeholder: str,
+    selection: list[str],
+):
+    """Filter the list on search."""
     if not ctx.triggered_id:
         return no_update, no_update
+
     value = values[0] if ctx.triggered_id["side"] == "left" else values[1]
     filtered = [v for v in value if not search or search.lower() in v["label"].lower()]
     children = None
@@ -247,14 +292,26 @@ def update_checklist(search, values, nothing_found, placeholder,selection):
     State(TransferList.ids.main(MATCH), "data-transferallmatchingfilters"),
     prevent_initial_call=True,
 )
-def transfer(trigger1, trigger2, selection, search, current_value, placeholder, transfer_matching):
+def transfer_values(
+    trigger1: list[int],
+    trigger2: list[int],
+    selection: list[list[str]],
+    search: list[str],
+    current_value: list[list[dict]],
+    placeholder: str,
+    transfer_matching: str,
+):
+    """Transfer items from one list to the other."""
     if not (ctx.triggered_id and (any(trigger1) or any(trigger2))):
         return no_update, no_update, no_update, no_update
 
     side = ctx.triggered_id["side"]
+    # Transfer selected items when clicking the transfer button
     if ctx.triggered_id["part"] == TransferList.ids.transfer("", "")["part"]:
         transferred = selection[0] if side == "left" else selection[1]
+    # Transfer all items when clicking the transfer all button
     else:
+        # Filter out items that don't match the search if transfer_matching is set
         if json.loads(transfer_matching):
             search_ = search[0 if side == "left" else 1]
             transferred = [
@@ -267,6 +324,7 @@ def transfer(trigger1, trigger2, selection, search, current_value, placeholder, 
     if not transferred:
         return no_update, [no_update] * 2, [no_update] * 2, [no_update] * 2
 
+    # Update the value
     if side == "left":
         new_value = [
             [v for v in current_value[0] if v["value"] not in transferred],
@@ -278,6 +336,7 @@ def transfer(trigger1, trigger2, selection, search, current_value, placeholder, 
             [v for v in current_value[1] if v["value"] not in transferred],
         ]
 
+    # Create the new checkboxes or placeholder texts
     placeholder = json.loads(placeholder)
     new_children = [
         [TransferList.checkbox(v) for v in new_value[0]]
@@ -287,9 +346,11 @@ def transfer(trigger1, trigger2, selection, search, current_value, placeholder, 
         if new_value[1]
         else dmc.Text(placeholder, p="0.5rem", c="dimmed"),
     ]
+
     return new_value, new_children, [[]] * 2, [""] * 2
 
 
+# Gray out the transfer button when nothing is selected
 clientside_callback(
     """(selection, style) => {
         return {
@@ -304,6 +365,7 @@ clientside_callback(
 )
 
 
+# Gray out the transfer all button when nothing can be transferred
 clientside_callback(
     """(filtered, style) => {
         const disabled = !filtered || !filtered.length

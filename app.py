@@ -1,7 +1,6 @@
 import dash_mantine_components as dmc
 from dash import Dash, Input, Output, callback
 from transferlist_aio import TransferList
-from dash_iconify import DashIconify
 
 app = Dash(
     __name__,
@@ -52,7 +51,7 @@ app.layout = dmc.MantineProvider(
                 titles=["Source", "Destination"],
                 transferAllMatchingFilters=True,
             ),
-            dmc.Text(id="display", py="1rem"),
+            dmc.Text(id="display", py="2rem"),
         ]
     )
 )
